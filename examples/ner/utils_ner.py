@@ -65,7 +65,7 @@ def read_examples_from_file(data_dir, mode):
                     words = []
                     labels = []
             else:
-                splits = line.split(" ")
+                splits = line.split("\t")
                 words.append(splits[0])
                 if len(splits) > 1:
                     labels.append(splits[-1].replace("\n", ""))
@@ -114,8 +114,12 @@ def convert_examples_to_features(
             word_tokens = tokenizer.tokenize(word)
             tokens.extend(word_tokens)
             # Use the real label id for the first token of the word, and padding ids for the remaining tokens
-            label_ids.extend([label_map[label]] + [pad_token_label_id] * (len(word_tokens) - 1))
+            if label in label_map:
+                label_ids.extend([label_map[label]] + [pad_token_label_id] * (len(word_tokens) - 1))
+            else:
+                label_ids.extend([1] + [pad_token_label_id] * (len(word_tokens) - 1))
 
+        logger.info("Example length in subtokens: %d ", len(tokens))
         # Account for [CLS] and [SEP] with "- 2" and with "- 3" for RoBERTa.
         special_tokens_count = 3 if sep_token_extra else 2
         if len(tokens) > max_seq_length - special_tokens_count:
