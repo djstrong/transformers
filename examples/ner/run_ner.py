@@ -661,7 +661,10 @@ def main():
         tokenizer = tokenizer_class.from_pretrained(args.output_dir, do_lower_case=args.do_lower_case)
         model = model_class.from_pretrained(args.output_dir)
         model.to(args.device)
+        import time
+        start_time = time.time()
         result, predictions = evaluate(args, model, tokenizer, labels, pad_token_label_id, mode="test")
+        print("--- %s seconds ---" % (time.time() - start_time))
         # Save results
         output_test_results_file = os.path.join(args.output_dir, "test_results.txt")
         with open(output_test_results_file, "w") as writer:
