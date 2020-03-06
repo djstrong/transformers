@@ -24,7 +24,7 @@ import random
 
 import numpy as np
 import torch
-from seqeval.metrics import f1_score, precision_score, recall_score
+from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from torch.utils.data.distributed import DistributedSampler
@@ -219,6 +219,8 @@ def train(args, train_dataset, model, tokenizer, labels, pad_token_label_id):
 
                 scheduler.step()  # Update learning rate schedule
                 optimizer.step()
+                logger.info("Last LR %s", str(scheduler.get_last_lr()))
+                
                 model.zero_grad()
                 global_step += 1
 
@@ -230,6 +232,13 @@ def train(args, train_dataset, model, tokenizer, labels, pad_token_label_id):
                         results, _ = evaluate(args, model, tokenizer, labels, pad_token_label_id, mode="dev")
                         for key, value in results.items():
                             tb_writer.add_scalar("eval_{}".format(key), value, global_step)
+                            
+                    if (
+                        args.local_rank == -1 and args.test_during_training
+                    ):  # Only evaluate when single GPU otherwise metrics may not average well
+                        results, _ = evaluate(args, model, tokenizer, labels, pad_token_label_id, mode="test")
+                        for key, value in results.items():
+                            tb_writer.add_scalar("test_{}".format(key), value, global_step)
                     tb_writer.add_scalar("lr", scheduler.get_lr()[0], global_step)
                     tb_writer.add_scalar("loss", (tr_loss - logging_loss) / args.logging_steps, global_step)
                     logging_loss = tr_loss
@@ -333,6 +342,7 @@ def evaluate(args, model, tokenizer, labels, pad_token_label_id, mode, prefix=""
         "precision": precision_score(out_label_list, preds_list),
         "recall": recall_score(out_label_list, preds_list),
         "f1": f1_score(out_label_list, preds_list),
+        "cr": classification_report(out_label_list, preds_list),
     }
 
     logger.info("***** Eval results %s *****", prefix)
@@ -463,6 +473,11 @@ def main():
         "--evaluate_during_training",
         action="store_true",
         help="Whether to run evaluation during training at each logging step.",
+    )
+    parser.add_argument(
+        "--test_during_training",
+        action="store_true",
+        help="Whether to run evaluation of test data during training at each logging step.",
     )
     parser.add_argument(
         "--do_lower_case", action="store_true", help="Set this flag if you are using an uncased model."
@@ -636,8 +651,8 @@ def main():
 
         # Good practice: save your training arguments together with the trained model
         torch.save(args, os.path.join(args.output_dir, "training_args.bin"))
-        torch.save(optimizer.state_dict(), os.path.join(args.output_dir, "optimizer.pt"))
-        torch.save(scheduler.state_dict(), os.path.join(args.output_dir, "scheduler.pt"))
+        #torch.save(optimizer.state_dict(), os.path.join(args.output_dir, "optimizer.pt"))
+        #torch.save(scheduler.state_dict(), os.path.join(args.output_dir, "scheduler.pt")) #LR is 0
 
 
     # Evaluation

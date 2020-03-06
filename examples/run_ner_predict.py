@@ -25,7 +25,7 @@ import sys
 
 import numpy as np
 import torch
-from seqeval.metrics import f1_score, precision_score, recall_score
+from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
 from torch.nn import CrossEntropyLoss
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from torch.utils.data.distributed import DistributedSampler
@@ -302,6 +302,7 @@ def evaluate(args, model, tokenizer, labels, pad_token_label_id, mode, prefix=""
             "precision": precision_score(out_label_listX, preds_listX),
             "recall": recall_score(out_label_listX, preds_listX),
             "f1": f1_score(out_label_listX, preds_listX),
+            "cr": classification_report(out_label_listX, preds_listX),
         }
         
         logger.info("***** Eval results %s *****", prefix)
@@ -535,12 +536,12 @@ def main():
         result, predictions = evaluate(args, model, tokenizer, labels, pad_token_label_id, mode="test")
         print("--- %s seconds ---" % (time.time() - start_time))
         # Save results
-        output_test_results_file = os.path.join(args.output_dir, "test_results.txt")
+        output_test_results_file = os.path.join(args.output_dir, "test_results_long.txt")
         with open(output_test_results_file, "w") as writer:
             for key in sorted(result.keys()):
                 writer.write("{} = {}\n".format(key, str(result[key])))
         # Save predictions
-        output_test_predictions_file = os.path.join(args.output_dir, "test_predictions.txt")
+        output_test_predictions_file = os.path.join(args.output_dir, "test_predictions_long.txt")
         with open(output_test_predictions_file, "w") as writer:
             with open(os.path.join(args.data_dir, "test.txt"), "r") as f:
                 example_id = 0
@@ -550,10 +551,10 @@ def main():
                         if not predictions[example_id]:
                             example_id += 1
                     elif predictions[example_id]:
-                        output_line = line.split()[0] + " " + predictions[example_id].pop(0) + "\n"
+                        output_line = line.split("\t")[0] + "\t" + predictions[example_id].pop(0) + "\n"
                         writer.write(output_line)
                     else:
-                        logger.warning("Maximum sequence length exceeded: No prediction for '%s'.", line.split()[0])
+                        logger.warning("Maximum sequence length exceeded: No prediction for '%s'.", line.split("\t")[0])
 
 
 

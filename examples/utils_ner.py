@@ -103,6 +103,8 @@ def convert_examples_to_features(
 
     label_map = {label: i for i, label in enumerate(label_list)}
 
+    text_lengths=[]
+
     features = []
     for (ex_index, example) in enumerate(examples):
         if ex_index % 10000 == 0:
@@ -119,7 +121,8 @@ def convert_examples_to_features(
             else:
                 label_ids.extend([1] + [pad_token_label_id] * (len(word_tokens) - 1))
 
-        logger.info("Example length in subtokens: %d ", len(tokens))
+        # logger.info("Example length in subtokens: %d ", len(tokens))
+        text_lengths.append(len(tokens))
         # Account for [CLS] and [SEP] with "- 2" and with "- 3" for RoBERTa.
         special_tokens_count = 3 if sep_token_extra else 2
         if len(tokens) > max_seq_length - special_tokens_count:
@@ -197,6 +200,16 @@ def convert_examples_to_features(
         features.append(
             InputFeatures(input_ids=input_ids, input_mask=input_mask, segment_ids=segment_ids, label_ids=label_ids)
         )
+
+    print("Max length in subtokens: %d Avg: %d Median: %d" % (max(text_lengths), sum(text_lengths)/len(text_lengths), list(sorted(text_lengths))[len(text_lengths)//2]))
+    print("Examples: %d" % (len(examples),))
+    for length in sorted(set([max_seq_length, 64,128,256,384,512])):
+        print("Splitting with max_seq_length %d gives %d examples not losing %d tokens (%.2f%%)" % 
+              (length, 
+               sum([((l+special_tokens_count)//length)+1 for l in text_lengths]),
+               sum([(l-length) for l in text_lengths if l>length]),
+               sum([(l-length) for l in text_lengths if l>length])/sum(text_lengths)*100
+               ))
     return features
 
 
